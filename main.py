@@ -37,17 +37,19 @@ async def addbirthday(ctx, name: str, date: str):
     if not is_admin:
         existing = birthdays.find_one({"user_id": user_id})
         if existing:
-            message = await ctx.reply("Ya registraste tu cumpleaños.")
-            await message.add_reaction("❌")  # Reacción de error
+            message = await ctx.reply("❌ Ya registraste tu cumpleaños.")
+            await message.add_reaction("❌")
             return
 
     try:
+        # Validamos el formato de fecha DD-MM
         datetime.strptime(date, "%d-%m")
     except ValueError:
-        message = await ctx.reply("Formato inválido. Usá DD-MM.")
-        await message.add_reaction("❌")  # Reacción de error
+        message = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
+        await message.add_reaction("❌")
         return
 
+    # Insertamos el cumpleaños
     birthdays.insert_one({
         "user_id": user_id,
         "username": str(ctx.author),
@@ -55,10 +57,9 @@ async def addbirthday(ctx, name: str, date: str):
         "date": date
     })
 
-    message = await ctx.reply(f"Cumpleaños guardado para {name} el {date}.")
-    await message.add_reaction("✔️")  # Reacción de éxito
+    message = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** el **{date}**.")
+    await message.add_reaction("✅")  # Éxito
 
-    # Después de agregar el cumpleaños, actualizamos el mensaje fijado
     await update_birthday_message(ctx)
 
 async def update_birthday_message(ctx):

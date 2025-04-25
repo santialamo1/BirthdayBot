@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 from pymongo import MongoClient
 from datetime import datetime
 import os
+import random
 from collections import defaultdict
 
 intents = discord.Intents.default()
@@ -28,8 +29,8 @@ async def on_ready():
     check_birthdays.start()
 
 @bot.command()
-async def addbirthday(ctx, date: str):
-    """Agrega tu cumpleaños en formato DD-MM."""
+async def addbirthday(ctx, name: str, date: str):
+    """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
     user_id = ctx.author.id
     is_admin = ctx.author.guild_permissions.administrator
 
@@ -45,13 +46,14 @@ async def addbirthday(ctx, date: str):
         await ctx.reply("Formato inválido. Usá DD-MM.")
         return
 
-    birthdays.update_one(
-        {"user_id": user_id},
-        {"$set": {"username": str(ctx.author), "date": date}},
-        upsert=True
-    )
+    birthdays.insert_one({
+        "user_id": user_id,
+        "username": str(ctx.author),
+        "name": name,
+        "date": date
+    })
 
-    await ctx.reply(f"Cumpleaños guardado para {date}.")
+    await ctx.reply(f"Cumpleaños guardado para {name} el {date}.")
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -70,8 +72,8 @@ async def check_birthdays():
         print("No se encontró el servidor.")
         return
 
-    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)
-    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)
+    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)  # Enviar al canal de chat para saludos
+    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)  # Canal para la lista de cumpleaños
 
     if not channel_chat or not channel_cumples:
         print("No se encontraron los canales.")
@@ -80,10 +82,22 @@ async def check_birthdays():
     today = datetime.now().strftime("%d-%m")
     celebrants = list(birthdays.find({"date": today}))
 
+    # Generar mensaje de cumpleaños
+    birthday_messages = [
+    "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje. ¡Tu lealtad y valentía han sido pilares de nuestra grandeza! Que este cumpleaños te traiga prosperidad, éxitos y alegría sin igual. El Imperio entero celebra contigo. 🎂",
+    "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras de sabiduría y gratitud a <@{user_id}>. Tu compromiso con el Imperio es digno de canciones y crónicas. Que los festejos sean abundantes y tus deseos se hagan realidad. 🥳",
+    "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek. Tu dedicación fortalece nuestras tierras y eleva nuestra causa. Que tu cumpleaños esté lleno de momentos memorables y triunfos dignos de tu grandeza. 🎈",
+    "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>! Tus esfuerzos y devoción son inspiración para todos los habitantes del Imperio. Que los festejos estén llenos de luz, alegría y momentos dignos de recordar. 🎁",
+    "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración del Emperador Jerek! Este día está marcado por el honor y la celebración que mereces. Que tu futuro esté lleno de gloria y felicidad. 🍷",
+    "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado con festivales y júbilo en todo el Imperio! Tus contribuciones a nuestra comunidad son eternas, y tu grandeza no pasa desapercibida. ¡Felicidades en este día especial! 🌟",
+]
+
+
     if celebrants:
         for user_data in celebrants:
             user_id = user_data["user_id"]
-            await channel_chat.send(f"🎉 ¡Feliz cumpleaños, <@{user_id}>! Que tengas un gran día.")
+            msg = random.choice(birthday_messages).format(user_id=user_id)  # Elige aleatoriamente un mensaje
+            await channel_chat.send(msg)  # Enviar el mensaje al canal de chat
 
     # 🎂 Generar lista organizada por mes (en español)
     all_birthdays = birthdays.find()
@@ -101,11 +115,11 @@ async def check_birthdays():
             dia, mes = date_str.split("-")
             nombre_mes = meses_es.get(mes.zfill(2))
             if nombre_mes:
-                organized[nombre_mes].append((int(dia), entry["username"]))
+                organized[nombre_mes].append((int(dia), entry.get("name", entry["username"])))
         except:
             continue
 
-    # Armar el mensaje
+    # Armar el mensaje de la lista de cumpleaños organizada
     months_order = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -120,13 +134,12 @@ async def check_birthdays():
     if not message.strip():
         message = "No hay cumpleaños registrados aún."
 
-    # 📌 Actualizar o fijar mensaje
+    # 📌 Actualizar o fijar el mensaje en el canal de cumpleaños
     pinned = await channel_cumples.pins()
     if pinned:
         await pinned[0].edit(content=message)
     else:
         msg = await channel_cumples.send(message)
         await msg.pin()
-
 
 bot.run(DISCORD_TOKEN)

@@ -80,37 +80,44 @@ async def check_birthdays():
     today = datetime.now().strftime("%d-%m")
     celebrants = list(birthdays.find({"date": today}))
 
-    # 🎉 Felicitar a quienes cumplen hoy
     if celebrants:
         for user_data in celebrants:
             user_id = user_data["user_id"]
             await channel_chat.send(f"🎉 ¡Feliz cumpleaños, <@{user_id}>! Que tengas un gran día.")
 
-    # 🎂 Actualizar lista de cumpleaños con formato por mes
+    # 🎂 Generar lista organizada por mes (en español)
     all_birthdays = birthdays.find()
     organized = defaultdict(list)
+    
+    meses_es = {
+        "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+        "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+        "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+    }
+
     for entry in all_birthdays:
         date_str = entry["date"]
         try:
-            date = datetime.strptime(date_str, "%d-%m")
-            month = date.strftime("%B")  # Ej: "October"
-            organized[month].append((date.day, entry["username"]))
+            dia, mes = date_str.split("-")
+            nombre_mes = meses_es.get(mes.zfill(2))
+            if nombre_mes:
+                organized[nombre_mes].append((int(dia), entry["username"]))
         except:
             continue
 
-    # Ordenar y formatear el mensaje
+    # Armar el mensaje
     months_order = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ]
     message = ""
-    for month in months_order:
-        if month in organized:
-            message += f"\n🎈{month}\n"
-            for day, name in sorted(organized[month]):
-                message += f"        {day} {name}\n"
+    for mes in months_order:
+        if mes in organized:
+            message += f"\n🎈{mes}\n"
+            for dia, nombre in sorted(organized[mes]):
+                message += f"        {dia} {nombre}\n"
 
-    if not message:
+    if not message.strip():
         message = "No hay cumpleaños registrados aún."
 
     # 📌 Actualizar o fijar mensaje
@@ -120,5 +127,6 @@ async def check_birthdays():
     else:
         msg = await channel_cumples.send(message)
         await msg.pin()
+
 
 bot.run(DISCORD_TOKEN)

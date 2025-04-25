@@ -29,10 +29,16 @@ async def on_ready():
     check_birthdays.start()
 
 @bot.command()
-async def addbirthday(ctx, name: str, date: str):
+async def addbirthday(ctx, name: str = None, date: str = None):
     """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
     user_id = ctx.author.id
     is_admin = ctx.author.guild_permissions.administrator
+
+    # Verificar si el comando fue ejecutado con ambos argumentos
+    if not name or not date:
+        message = await ctx.reply("❌ Falta información. El formato correcto es: `!addbirthday Nombre DD-MM`")
+        await message.add_reaction("❌")
+        return
 
     if not is_admin:
         existing = birthdays.find_one({"user_id": user_id})

@@ -54,6 +54,8 @@ async def addbirthday(ctx, name: str, date: str):
     })
 
     await ctx.reply(f"Cumpleaños guardado para {name} el {date}.")
+    # Después de agregar el cumpleaños, actualizamos el mensaje fijado
+    await update_birthday_message(ctx)
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -62,44 +64,21 @@ async def removebirthday(ctx, user: discord.User):
     result = birthdays.delete_one({"user_id": user.id})
     if result.deleted_count:
         await ctx.reply(f"Cumpleaños de {user} eliminado.")
+        # Después de eliminar el cumpleaños, actualizamos el mensaje fijado
+        await update_birthday_message(ctx)
     else:
         await ctx.reply("Ese usuario no tiene cumpleaños registrado.")
 
-@tasks.loop(hours=24)
-async def check_birthdays():
-    guild = bot.get_guild(GUILD_ID)
-    if not guild:
-        print("No se encontró el servidor.")
+async def update_birthday_message(ctx):
+    """Actualiza el mensaje fijado con la lista de cumpleaños."""
+    guild = ctx.guild
+    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)
+
+    if not channel_cumples:
+        print("No se encontró el canal de cumpleaños.")
         return
 
-    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)  # Enviar al canal de chat para saludos
-    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)  # Canal para la lista de cumpleaños
-
-    if not channel_chat or not channel_cumples:
-        print("No se encontraron los canales.")
-        return
-
-    today = datetime.now().strftime("%d-%m")
-    celebrants = list(birthdays.find({"date": today}))
-
-    # Generar mensaje de cumpleaños
-    birthday_messages = [
-    "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje. ¡Tu lealtad y valentía han sido pilares de nuestra grandeza! Que este cumpleaños te traiga prosperidad, éxitos y alegría sin igual. El Imperio entero celebra contigo. 🎂",
-    "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras de sabiduría y gratitud a <@{user_id}>. Tu compromiso con el Imperio es digno de canciones y crónicas. Que los festejos sean abundantes y tus deseos se hagan realidad. 🥳",
-    "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek. Tu dedicación fortalece nuestras tierras y eleva nuestra causa. Que tu cumpleaños esté lleno de momentos memorables y triunfos dignos de tu grandeza. 🎈",
-    "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>! Tus esfuerzos y devoción son inspiración para todos los habitantes del Imperio. Que los festejos estén llenos de luz, alegría y momentos dignos de recordar. 🎁",
-    "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración del Emperador Jerek! Este día está marcado por el honor y la celebración que mereces. Que tu futuro esté lleno de gloria y felicidad. 🍷",
-    "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado con festivales y júbilo en todo el Imperio! Tus contribuciones a nuestra comunidad son eternas, y tu grandeza no pasa desapercibida. ¡Felicidades en este día especial! 🌟",
-]
-
-
-    if celebrants:
-        for user_data in celebrants:
-            user_id = user_data["user_id"]
-            msg = random.choice(birthday_messages).format(user_id=user_id)  # Elige aleatoriamente un mensaje
-            await channel_chat.send(msg)  # Enviar el mensaje al canal de chat
-
-    # 🎂 Generar lista organizada por mes (en español)
+    # Generar lista organizada por mes (en español)
     all_birthdays = birthdays.find()
     organized = defaultdict(list)
     
@@ -141,5 +120,36 @@ async def check_birthdays():
     else:
         msg = await channel_cumples.send(message)
         await msg.pin()
+
+@tasks.loop(hours=24)
+async def check_birthdays():
+    guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        print("No se encontró el servidor.")
+        return
+
+    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)  # Enviar al canal de chat para saludos
+    if not channel_chat:
+        print("No se encontró el canal de chat.")
+        return
+
+    today = datetime.now().strftime("%d-%m")
+    celebrants = list(birthdays.find({"date": today}))
+
+    # Generar mensaje de cumpleaños
+    birthday_messages = [
+        "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje. ¡Tu lealtad y valentía han sido pilares de nuestra grandeza! Que este cumpleaños te traiga prosperidad, éxitos y alegría sin igual. El Imperio entero celebra contigo. 🎂",
+        "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras de sabiduría y gratitud a <@{user_id}>. Tu compromiso con el Imperio es digno de canciones y crónicas. Que los festejos sean abundantes y tus deseos se hagan realidad. 🥳",
+        "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek. Tu dedicación fortalece nuestras tierras y eleva nuestra causa. Que tu cumpleaños esté lleno de momentos memorables y triunfos dignos de tu grandeza. 🎈",
+        "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>! Tus esfuerzos y devoción son inspiración para todos los habitantes del Imperio. Que los festejos estén llenos de luz, alegría y momentos dignos de recordar. 🎁",
+        "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración del Emperador Jerek! Este día está marcado por el honor y la celebración que mereces. Que tu futuro esté lleno de gloria y felicidad. 🍷",
+        "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado con festivales y júbilo en todo el Imperio! Tus contribuciones a nuestra comunidad son eternas, y tu grandeza no pasa desapercibida. ¡Felicidades en este día especial! 🌟",
+    ]
+
+    if celebrants:
+        for user_data in celebrants:
+            user_id = user_data["user_id"]
+            msg = random.choice(birthday_messages).format(user_id=user_id)  # Elige aleatoriamente un mensaje
+            await channel_chat.send(msg)  # Enviar el mensaje al canal de chat
 
 bot.run(DISCORD_TOKEN)

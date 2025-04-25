@@ -37,13 +37,15 @@ async def addbirthday(ctx, name: str, date: str):
     if not is_admin:
         existing = birthdays.find_one({"user_id": user_id})
         if existing:
-            await ctx.reply("Ya registraste tu cumpleaños.")
+            message = await ctx.reply("Ya registraste tu cumpleaños.")
+            await message.add_reaction("❌")  # Reacción de error
             return
 
     try:
         datetime.strptime(date, "%d-%m")
     except ValueError:
-        await ctx.reply("Formato inválido. Usá DD-MM.")
+        message = await ctx.reply("Formato inválido. Usá DD-MM.")
+        await message.add_reaction("❌")  # Reacción de error
         return
 
     birthdays.insert_one({
@@ -53,9 +55,58 @@ async def addbirthday(ctx, name: str, date: str):
         "date": date
     })
 
-    await ctx.reply(f"Cumpleaños guardado para {name} el {date}.")
+    message = await ctx.reply(f"Cumpleaños guardado para {name} el {date}.")
+    await message.add_reaction("✔️")  # Reacción de éxito
+
     # Después de agregar el cumpleaños, actualizamos el mensaje fijado
     await update_birthday_message(ctx)
+
+async def update_birthday_message(ctx):
+    guild = ctx.guild
+    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)  # Canal para la lista de cumpleaños
+
+    # 🎂 Generar lista organizada por mes (en español)
+    all_birthdays = birthdays.find()
+    organized = defaultdict(list)
+
+    meses_es = {
+        "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+        "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+        "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+    }
+
+    for entry in all_birthdays:
+        date_str = entry["date"]
+        try:
+            dia, mes = date_str.split("-")
+            nombre_mes = meses_es.get(mes.zfill(2))
+            if nombre_mes:
+                organized[nombre_mes].append((int(dia), entry.get("name", entry["username"])))
+        except:
+            continue
+
+    # Armar el mensaje de la lista de cumpleaños organizada
+    months_order = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ]
+    message = ""
+    for mes in months_order:
+        if mes in organized:
+            message += f"\n🎈{mes}\n"
+            for dia, nombre in sorted(organized[mes]):
+                message += f"        {dia} {nombre}\n"
+
+    if not message.strip():
+        message = "No hay cumpleaños registrados aún."
+
+    # 📌 Actualizar o fijar el mensaje en el canal de cumpleaños
+    pinned = await channel_cumples.pins()
+    if pinned:
+        await pinned[0].edit(content=message)
+    else:
+        msg = await channel_cumples.send(message)
+        await msg.pin()
 
 @bot.command()
 @commands.has_permissions(administrator=True)

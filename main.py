@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 from pymongo import MongoClient
 from datetime import datetime
 import os
+from collections import defaultdict
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -80,11 +81,30 @@ async def check_birthdays():
             user_id = user_data["user_id"]
             await channel_chat.send(f"🎉 ¡Feliz cumpleaños, <@{user_id}>! Que tengas un gran día.")
     
-    # Actualizar lista en el canal cumpleaños
-    all_birthdays = birthdays.find().sort("date", 1)
-    message = "**🎂 Lista de cumpleaños del servidor:**\n"
+    # Actualizar lista en el canal cumpleaños con formato por mes
+    all_birthdays = birthdays.find()
+    cumples_por_mes = defaultdict(list)
+
     for b in all_birthdays:
-        message += f"<@{b['user_id']}> → {b['date']}\n"
+        try:
+            fecha = datetime.strptime(b["date"], "%d-%m")
+            mes_nombre = fecha.strftime("%B")
+            cumples_por_mes[mes_nombre].append((fecha.day, b["username"]))
+        except ValueError:
+            continue
+
+    orden_meses = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]
+
+    message = ""
+    for mes in orden_meses:
+        if mes in cumples_por_mes:
+            message += f"🎈**{mes}**\n"
+            for dia, username in sorted(cumples_por_mes[mes]):
+                message += f"\t{dia} {username}\n"
+            message += "\n"
 
     pinned = await channel_cumples.pins()
     if pinned:

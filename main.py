@@ -66,8 +66,8 @@ async def check_birthdays():
     today = datetime.now().strftime("%d-%m")
     guild = bot.get_guild(GUILD_ID)
 
-    channel_chat = discord.utils.get(guild.text_channels, name="chat")
-    channel_cumples = discord.utils.get(guild.text_channels, name="cumpleaños")
+    channel_chat = discord.utils.get(guild.text_channels, name="┆💬┆𝖢𝗁𝖺𝗍")  # Canal de chat
+    channel_cumples = discord.utils.get(guild.text_channels, name="┆🎉┆𝗖𝘂𝗺𝗽𝗹𝗲𝗮𝗻̃𝗼𝘀")  # Canal de cumpleaños
 
     if not channel_chat or not channel_cumples:
         print("No se encontraron los canales.")
@@ -82,11 +82,9 @@ async def check_birthdays():
     
     # Actualizar lista en el canal cumpleaños
     all_birthdays = birthdays.find().sort("date", 1)
-    message = "**🎂 Lista de cumpleaños del servidor:**
-"
+    message = "**🎂 Lista de cumpleaños del servidor:**\n"
     for b in all_birthdays:
-        message += f"<@{b['user_id']}> → {b['date']}
-"
+        message += f"<@{b['user_id']}> → {b['date']}\n"
 
     pinned = await channel_cumples.pins()
     if pinned:

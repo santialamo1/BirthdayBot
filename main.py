@@ -12,10 +12,11 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Variables de entorno desde Railway (no uses .env en prod)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
 GUILD_ID = int(os.getenv("GUILD_ID"))
+CHANNEL_CHAT_ID = int(os.getenv("CHANNEL_CHAT_ID"))
+CHANNEL_CUMPLES_ID = int(os.getenv("CHANNEL_CUMPLES_ID"))
 
 client = MongoClient(MONGO_URI)
 db = client["birthdaybot"]
@@ -44,11 +45,11 @@ async def addbirthday(ctx, date: str):
         await ctx.reply("Formato inválido. Usá DD-MM.")
         return
 
-    birthdays.insert_one({
-        "user_id": user_id,
-        "username": str(ctx.author),
-        "date": date
-    })
+    birthdays.update_one(
+        {"user_id": user_id},
+        {"$set": {"username": str(ctx.author), "date": date}},
+        upsert=True
+    )
 
     await ctx.reply(f"Cumpleaños guardado para {date}.")
 
@@ -64,48 +65,55 @@ async def removebirthday(ctx, user: discord.User):
 
 @tasks.loop(hours=24)
 async def check_birthdays():
-    today = datetime.now().strftime("%d-%m")
     guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        print("No se encontró el servidor.")
+        return
 
-    channel_chat = discord.utils.get(guild.text_channels, name="┆💬┆𝖢𝗁𝖺𝗍")  # Canal de chat
-    channel_cumples = discord.utils.get(guild.text_channels, name="┆🎉┆𝗖𝘂𝗺𝗽𝗹𝗲𝗮𝗻̃𝗼𝘀")  # Canal de cumpleaños
+    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)
+    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)
 
     if not channel_chat or not channel_cumples:
         print("No se encontraron los canales.")
         return
 
+    today = datetime.now().strftime("%d-%m")
     celebrants = list(birthdays.find({"date": today}))
 
+    # 🎉 Felicitar a quienes cumplen hoy
     if celebrants:
         for user_data in celebrants:
             user_id = user_data["user_id"]
             await channel_chat.send(f"🎉 ¡Feliz cumpleaños, <@{user_id}>! Que tengas un gran día.")
-    
-    # Actualizar lista en el canal cumpleaños con formato por mes
-    all_birthdays = birthdays.find()
-    cumples_por_mes = defaultdict(list)
 
-    for b in all_birthdays:
+    # 🎂 Actualizar lista de cumpleaños con formato por mes
+    all_birthdays = birthdays.find()
+    organized = defaultdict(list)
+    for entry in all_birthdays:
+        date_str = entry["date"]
         try:
-            fecha = datetime.strptime(b["date"], "%d-%m")
-            mes_nombre = fecha.strftime("%B")
-            cumples_por_mes[mes_nombre].append((fecha.day, b["username"]))
-        except ValueError:
+            date = datetime.strptime(date_str, "%d-%m")
+            month = date.strftime("%B")  # Ej: "October"
+            organized[month].append((date.day, entry["username"]))
+        except:
             continue
 
-    orden_meses = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+    # Ordenar y formatear el mensaje
+    months_order = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ]
-
     message = ""
-    for mes in orden_meses:
-        if mes in cumples_por_mes:
-            message += f"🎈**{mes}**\n"
-            for dia, username in sorted(cumples_por_mes[mes]):
-                message += f"\t{dia} {username}\n"
-            message += "\n"
+    for month in months_order:
+        if month in organized:
+            message += f"\n🎈{month}\n"
+            for day, name in sorted(organized[month]):
+                message += f"        {day} {name}\n"
 
+    if not message:
+        message = "No hay cumpleaños registrados aún."
+
+    # 📌 Actualizar o fijar mensaje
     pinned = await channel_cumples.pins()
     if pinned:
         await pinned[0].edit(content=message)
@@ -113,5 +121,4 @@ async def check_birthdays():
         msg = await channel_cumples.send(message)
         await msg.pin()
 
-# Ejecutar bot
 bot.run(DISCORD_TOKEN)

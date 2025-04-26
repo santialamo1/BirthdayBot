@@ -35,11 +35,12 @@ async def addbirthday(ctx, name: str = None, date: str = None):
     """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
     
     # Verificar si el comando se ejecuta en el canal correcto
-    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
+    if ctx.channel.id != CHANNEL_CUMPLES_ID:
         message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
         await message.add_reaction("❌")
         await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje después de 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
         return
     
     user_id = ctx.author.id
@@ -50,7 +51,8 @@ async def addbirthday(ctx, name: str = None, date: str = None):
         message = await ctx.reply("❌ Falta información. El formato correcto es: `!addbirthday Nombre DD-MM`")
         await message.add_reaction("❌")
         await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje después de 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
         return
 
     if not is_admin:
@@ -59,7 +61,8 @@ async def addbirthday(ctx, name: str = None, date: str = None):
             message = await ctx.reply("❌ Ya registraste tu cumpleaños.")
             await message.add_reaction("❌")
             await asyncio.sleep(30)  # Esperar 30 segundos
-            await message.delete()  # Eliminar mensaje después de 30 segundos
+            await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+            await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
             return
 
     try:
@@ -69,7 +72,8 @@ async def addbirthday(ctx, name: str = None, date: str = None):
         message = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
         await message.add_reaction("❌")
         await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje después de 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
         return
 
     # Insertamos el cumpleaños
@@ -84,7 +88,8 @@ async def addbirthday(ctx, name: str = None, date: str = None):
     await ctx.message.add_reaction("✅")  # Reacción al mensaje original
 
     await asyncio.sleep(30)  # Esperar 30 segundos
-    await message.delete()  # Eliminar mensaje después de 30 segundos
+    await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+    await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
 
     await update_birthday_message(ctx)
 
@@ -140,14 +145,42 @@ async def update_birthday_message(ctx):
 @commands.has_permissions(administrator=True)
 async def removebirthday(ctx, user: discord.User):
     """Solo admins: elimina un cumpleaños."""
+    
+    # Verificar si el comando se ejecuta en el canal correcto
+    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
+        message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
+        await message.add_reaction("❌")
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        return
+
+    # Verificar si el autor del comando es admin
+    if not ctx.author.guild_permissions.administrator:
+        message = await ctx.reply("❌ No tienes permisos suficientes para usar este comando.")
+        await message.add_reaction("❌")
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        return
+
     result = birthdays.delete_one({"user_id": user.id})
+
     if result.deleted_count:
-        await ctx.reply(f"Cumpleaños de {user} eliminado.")
-        await ctx.message.add_reaction("✅")
+        message = await ctx.reply(f"✔️ Cumpleaños de {user} eliminado.")
+        await ctx.message.add_reaction("✅")  # Reacción al mensaje original
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+
         # Después de eliminar el cumpleaños, actualizamos el mensaje fijado
         await update_birthday_message(ctx)
     else:
-        await ctx.reply("Ese usuario no tiene cumpleaños registrado.")
+        message = await ctx.reply("❌ Ese usuario no tiene cumpleaños registrado.")
+        await message.add_reaction("❌")
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
+        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
 
 async def update_birthday_message(ctx):
     """Actualiza el mensaje fijado con la lista de cumpleaños."""

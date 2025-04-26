@@ -35,7 +35,7 @@ async def addbirthday(ctx, name: str = None, date: str = None):
     """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
     
     # Verificar si el comando se ejecuta en el canal correcto
-    if ctx.channel.id != CHANNEL_CUMPLES_ID:
+    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
         message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
         await message.add_reaction("❌")
         await asyncio.sleep(30)  # Esperar 30 segundos

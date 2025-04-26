@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import os
 import random
 from collections import defaultdict
+import asyncio
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -18,6 +19,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 CHANNEL_CHAT_ID = int(os.getenv("CHANNEL_CHAT_ID"))
 CHANNEL_CUMPLES_ID = int(os.getenv("CHANNEL_CUMPLES_ID"))
+CHANNEL_AGGCUMPLE_ID = int(os.getenv("CHANNEL_AGGCUMPLE_ID"))
 
 client = MongoClient(MONGO_URI)
 db = client["birthdaybot"]
@@ -29,52 +31,61 @@ async def on_ready():
     check_birthdays.start()
 
 @bot.command()
-async def addbirthday(ctx, name: str = None, date: str = None, user: discord.User = None):
-    """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM, o !addbirthday Nombre DD-MM @Usuario para admins"""
+async def addbirthday(ctx, name: str = None, date: str = None):
+    """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
+    
+    # Verificar si el comando se ejecuta en el canal correcto
+    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
+        message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
+        await message.add_reaction("❌")
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje después de 30 segundos
+        return
+    
     user_id = ctx.author.id
     is_admin = ctx.author.guild_permissions.administrator
 
     # Verificar si el comando fue ejecutado con ambos argumentos
     if not name or not date:
         message = await ctx.reply("❌ Falta información. El formato correcto es: `!addbirthday Nombre DD-MM`")
-        await ctx.message.add_reaction("❌")
+        await message.add_reaction("❌")
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje después de 30 segundos
         return
 
-    # Si no es admin y se menciona otro usuario, no se permite
-    if not is_admin and user:
-        message = await ctx.reply("❌ No puedes agregar cumpleaños para otros usuarios.")
-        await ctx.message.add_reaction("❌")
-        return
-
-    # Si el admin menciona a otro usuario, usar el id de ese usuario, sino el del que ejecutó el comando
-    target_user = user if is_admin and user else ctx.author
-
-    existing = birthdays.find_one({"user_id": target_user.id})
-    if existing:
-        message = await ctx.reply("❌ Ese usuario ya registró su cumpleaños.")
-        await ctx.message.add_reaction("❌")
-        return
+    if not is_admin:
+        existing = birthdays.find_one({"user_id": user_id})
+        if existing:
+            message = await ctx.reply("❌ Ya registraste tu cumpleaños.")
+            await message.add_reaction("❌")
+            await asyncio.sleep(30)  # Esperar 30 segundos
+            await message.delete()  # Eliminar mensaje después de 30 segundos
+            return
 
     try:
         # Validamos el formato de fecha DD-MM
         datetime.strptime(date, "%d-%m")
     except ValueError:
         message = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
-        await ctx.message.add_reaction("❌")
+        await message.add_reaction("❌")
+        await asyncio.sleep(30)  # Esperar 30 segundos
+        await message.delete()  # Eliminar mensaje después de 30 segundos
         return
 
     # Insertamos el cumpleaños
     birthdays.insert_one({
-        "user_id": target_user.id,
-        "username": str(target_user),
+        "user_id": user_id,
+        "username": str(ctx.author),
         "name": name,
         "date": date
     })
 
     message = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** el **{date}**.")
-    await ctx.message.add_reaction("✅")  # Éxito
+    await ctx.message.add_reaction("✅")  # Reacción al mensaje original
 
-    # Actualizamos la lista de cumpleaños
+    await asyncio.sleep(30)  # Esperar 30 segundos
+    await message.delete()  # Eliminar mensaje después de 30 segundos
+
     await update_birthday_message(ctx)
 
 

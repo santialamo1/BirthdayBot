@@ -191,19 +191,17 @@ async def removebirthday(ctx, user: discord.User):
         await message.delete()  # Eliminar mensaje del bot después de 30 segundos
         await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
 
+from collections import defaultdict
+import discord
+
 async def update_birthday_message(ctx):
-    """Actualiza el mensaje fijado con la lista de cumpleaños."""
     guild = ctx.guild
-    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)
+    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)  # Canal para la lista de cumpleaños
 
-    if not channel_cumples:
-        print("No se encontró el canal de cumpleaños.")
-        return
-
-    # Generar lista organizada por mes (en español)
+    # 🎂 Generar lista organizada por mes (en español)
     all_birthdays = birthdays.find()
     organized = defaultdict(list)
-    
+
     meses_es = {
         "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
         "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
@@ -211,13 +209,17 @@ async def update_birthday_message(ctx):
     }
 
     for entry in all_birthdays:
-        date_str = entry["date"]
+        date_str = entry.get("date")  # Usar .get() para evitar errores si no existe la clave
+        if not date_str:
+            continue  # Si no tiene fecha, ignorar el registro
+
         try:
             dia, mes = date_str.split("-")
             nombre_mes = meses_es.get(mes.zfill(2))
             if nombre_mes:
                 organized[nombre_mes].append((int(dia), entry.get("name", entry["username"])))
-        except:
+        except Exception as e:
+            print(f"Error procesando cumpleaños: {e}")
             continue
 
     # Armar el mensaje de la lista de cumpleaños organizada
@@ -225,12 +227,13 @@ async def update_birthday_message(ctx):
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ]
-    message = ""
+    message = "📅 **Calendario de Cumpleaños 🎂**\n\n🎈 **Cumpleaños por mes** 🎈\n"
+    
     for mes in months_order:
         if mes in organized:
-            message += f"\n🎈{mes}\n"
+            message += f"\n🎉 **{mes}:**\n"  # Título de cada mes con un emoji
             for dia, nombre in sorted(organized[mes]):
-                message += f"        {dia} {nombre}\n"
+                message += f"        {dia} - {nombre}\n"  # Detalle de cada cumpleaños
 
     if not message.strip():
         message = "No hay cumpleaños registrados aún."
@@ -242,6 +245,7 @@ async def update_birthday_message(ctx):
     else:
         msg = await channel_cumples.send(message)
         await msg.pin()
+
 
 # Reemplaza tu función check_birthdays por esta versión modificada:
 

@@ -37,13 +37,13 @@ async def addbirthday(ctx, name: str = None, date: str = None, user: discord.Use
     # Verificar si el comando fue ejecutado con ambos argumentos
     if not name or not date:
         message = await ctx.reply("❌ Falta información. El formato correcto es: `!addbirthday Nombre DD-MM`")
-        await message.add_reaction("❌")
+        await ctx.message.add_reaction("❌")
         return
 
     # Si no es admin y se menciona otro usuario, no se permite
     if not is_admin and user:
         message = await ctx.reply("❌ No puedes agregar cumpleaños para otros usuarios.")
-        await message.add_reaction("❌")
+        await ctx.message.add_reaction("❌")
         return
 
     # Si el admin menciona a otro usuario, usar el id de ese usuario, sino el del que ejecutó el comando
@@ -52,7 +52,7 @@ async def addbirthday(ctx, name: str = None, date: str = None, user: discord.Use
     existing = birthdays.find_one({"user_id": target_user.id})
     if existing:
         message = await ctx.reply("❌ Ese usuario ya registró su cumpleaños.")
-        await message.add_reaction("❌")
+        await ctx.message.add_reaction("❌")
         return
 
     try:
@@ -60,7 +60,7 @@ async def addbirthday(ctx, name: str = None, date: str = None, user: discord.Use
         datetime.strptime(date, "%d-%m")
     except ValueError:
         message = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
-        await message.add_reaction("❌")
+        await ctx.message.add_reaction("❌")
         return
 
     # Insertamos el cumpleaños
@@ -72,7 +72,7 @@ async def addbirthday(ctx, name: str = None, date: str = None, user: discord.Use
     })
 
     message = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** el **{date}**.")
-    await message.add_reaction("✅")  # Éxito
+    await ctx.message.add_reaction("✅")  # Éxito
 
     # Actualizamos la lista de cumpleaños
     await update_birthday_message(ctx)

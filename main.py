@@ -132,6 +132,7 @@ async def removebirthday(ctx, user: discord.User):
     result = birthdays.delete_one({"user_id": user.id})
     if result.deleted_count:
         await ctx.reply(f"Cumpleaños de {user} eliminado.")
+        await ctx.message.add_reaction("✅")
         # Después de eliminar el cumpleaños, actualizamos el mensaje fijado
         await update_birthday_message(ctx)
     else:

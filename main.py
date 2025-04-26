@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import random
 from collections import defaultdict
@@ -29,8 +29,8 @@ async def on_ready():
     check_birthdays.start()
 
 @bot.command()
-async def addbirthday(ctx, name: str = None, date: str = None):
-    """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
+async def addbirthday(ctx, name: str = None, date: str = None, user: discord.User = None):
+    """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM, o !addbirthday Nombre DD-MM @Usuario para admins"""
     user_id = ctx.author.id
     is_admin = ctx.author.guild_permissions.administrator
 
@@ -40,12 +40,20 @@ async def addbirthday(ctx, name: str = None, date: str = None):
         await message.add_reaction("❌")
         return
 
-    if not is_admin:
-        existing = birthdays.find_one({"user_id": user_id})
-        if existing:
-            message = await ctx.reply("❌ Ya registraste tu cumpleaños.")
-            await message.add_reaction("❌")
-            return
+    # Si no es admin y se menciona otro usuario, no se permite
+    if not is_admin and user:
+        message = await ctx.reply("❌ No puedes agregar cumpleaños para otros usuarios.")
+        await message.add_reaction("❌")
+        return
+
+    # Si el admin menciona a otro usuario, usar el id de ese usuario, sino el del que ejecutó el comando
+    target_user = user if is_admin and user else ctx.author
+
+    existing = birthdays.find_one({"user_id": target_user.id})
+    if existing:
+        message = await ctx.reply("❌ Ese usuario ya registró su cumpleaños.")
+        await message.add_reaction("❌")
+        return
 
     try:
         # Validamos el formato de fecha DD-MM
@@ -57,8 +65,8 @@ async def addbirthday(ctx, name: str = None, date: str = None):
 
     # Insertamos el cumpleaños
     birthdays.insert_one({
-        "user_id": user_id,
-        "username": str(ctx.author),
+        "user_id": target_user.id,
+        "username": str(target_user),
         "name": name,
         "date": date
     })
@@ -66,7 +74,9 @@ async def addbirthday(ctx, name: str = None, date: str = None):
     message = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** el **{date}**.")
     await message.add_reaction("✅")  # Éxito
 
+    # Actualizamos la lista de cumpleaños
     await update_birthday_message(ctx)
+
 
 async def update_birthday_message(ctx):
     guild = ctx.guild
@@ -179,6 +189,8 @@ async def update_birthday_message(ctx):
         msg = await channel_cumples.send(message)
         await msg.pin()
 
+# Reemplaza tu función check_birthdays por esta versión modificada:
+
 @tasks.loop(hours=24)
 async def check_birthdays():
     guild = bot.get_guild(GUILD_ID)
@@ -186,7 +198,7 @@ async def check_birthdays():
         print("No se encontró el servidor.")
         return
 
-    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)  # Enviar al canal de chat para saludos
+    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)
     if not channel_chat:
         print("No se encontró el canal de chat.")
         return
@@ -194,20 +206,30 @@ async def check_birthdays():
     today = datetime.now().strftime("%d-%m")
     celebrants = list(birthdays.find({"date": today}))
 
-    # Generar mensaje de cumpleaños
     birthday_messages = [
-        "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje. ¡Tu lealtad y valentía han sido pilares de nuestra grandeza! Que este cumpleaños te traiga prosperidad, éxitos y alegría sin igual. El Imperio entero celebra contigo. 🎂",
-        "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras de sabiduría y gratitud a <@{user_id}>. Tu compromiso con el Imperio es digno de canciones y crónicas. Que los festejos sean abundantes y tus deseos se hagan realidad. 🥳",
-        "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek. Tu dedicación fortalece nuestras tierras y eleva nuestra causa. Que tu cumpleaños esté lleno de momentos memorables y triunfos dignos de tu grandeza. 🎈",
-        "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>! Tus esfuerzos y devoción son inspiración para todos los habitantes del Imperio. Que los festejos estén llenos de luz, alegría y momentos dignos de recordar. 🎁",
-        "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración del Emperador Jerek! Este día está marcado por el honor y la celebración que mereces. Que tu futuro esté lleno de gloria y felicidad. 🍷",
-        "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado con festivales y júbilo en todo el Imperio! Tus contribuciones a nuestra comunidad son eternas, y tu grandeza no pasa desapercibida. ¡Felicidades en este día especial! 🌟",
+        "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje...",
+        "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras...",
+        "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek...",
+        "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>!...",
+        "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración...",
+        "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado...",
     ]
 
     if celebrants:
         for user_data in celebrants:
             user_id = user_data["user_id"]
-            msg = random.choice(birthday_messages).format(user_id=user_id)  # Elige aleatoriamente un mensaje
-            await channel_chat.send(msg)  # Enviar el mensaje al canal de chat
+            msg = random.choice(birthday_messages).format(user_id=user_id)
+            sent_msg = await channel_chat.send(msg)
+
+            # ⏳ Eliminar el mensaje después de 24 horas
+            async def delete_later(message):
+                await discord.utils.sleep_until(datetime.utcnow().replace(hour=message.created_at.hour, minute=message.created_at.minute, second=message.created_at.second) + timedelta(days=1))
+                try:
+                    await message.delete()
+                except discord.NotFound:
+                    pass
+
+            bot.loop.create_task(delete_later(sent_msg))
+
 
 bot.run(DISCORD_TOKEN)

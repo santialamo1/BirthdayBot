@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands, tasks
 from pymongo import MongoClient
 from datetime import datetime, timedelta
+import pytz  # Se agregó pytz para manejar la zona horaria
 import os
 import random
 from collections import defaultdict
@@ -25,6 +26,9 @@ client = MongoClient(MONGO_URI)
 db = client["birthdaybot"]
 birthdays = db["birthdays"]
 
+# Zona horaria de Argentina
+argentina_tz = pytz.timezone("America/Argentina/Buenos_Aires")
+
 @bot.event
 async def on_ready():
     print(f"¡Bot activo como {bot.user}!")
@@ -34,25 +38,23 @@ async def on_ready():
 async def addbirthday(ctx, name: str = None, date: str = None):
     """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
     
-    # Verificar si el comando se ejecuta en el canal correcto
     if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
         message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
         await message.add_reaction("❌")
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
         return
     
     user_id = ctx.author.id
     is_admin = ctx.author.guild_permissions.administrator
 
-    # Verificar si el comando fue ejecutado con ambos argumentos
     if not name or not date:
         message = await ctx.reply("❌ Falta información. El formato correcto es: `!addbirthday Nombre DD-MM`")
         await message.add_reaction("❌")
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
         return
 
     if not is_admin:
@@ -60,9 +62,9 @@ async def addbirthday(ctx, name: str = None, date: str = None):
         if existing:
             message = await ctx.reply("❌ Ya registraste tu cumpleaños.")
             await message.add_reaction("❌")
-            await asyncio.sleep(30)  # Esperar 30 segundos
-            await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-            await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+            await asyncio.sleep(30)
+            await message.delete()
+            await ctx.message.delete()
             return
 
     try:
@@ -71,12 +73,11 @@ async def addbirthday(ctx, name: str = None, date: str = None):
     except ValueError:
         message = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
         await message.add_reaction("❌")
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
         return
 
-    # Insertamos el cumpleaños
     birthdays.insert_one({
         "user_id": user_id,
         "username": str(ctx.author),
@@ -85,23 +86,18 @@ async def addbirthday(ctx, name: str = None, date: str = None):
     })
 
     message = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** el **{date}**.")
-    await ctx.message.add_reaction("✅")  # Reacción al mensaje original
+    await ctx.message.add_reaction("✅")
 
-    await asyncio.sleep(30)  # Esperar 30 segundos
-    await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-    await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+    await asyncio.sleep(30)
+    await message.delete()
+    await ctx.message.delete()
 
     await update_birthday_message(ctx)
 
-
-from collections import defaultdict
-import discord
-
 async def update_birthday_message(ctx):
     guild = ctx.guild
-    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)  # Canal para la lista de cumpleaños
+    channel_cumples = guild.get_channel(CHANNEL_CUMPLES_ID)
 
-    # 🎂 Generar lista organizada por mes (en español)
     all_birthdays = birthdays.find()
     organized = defaultdict(list)
 
@@ -112,9 +108,9 @@ async def update_birthday_message(ctx):
     }
 
     for entry in all_birthdays:
-        date_str = entry.get("date")  # Usar .get() para evitar errores si no existe la clave
+        date_str = entry.get("date")
         if not date_str:
-            continue  # Si no tiene fecha, ignorar el registro
+            continue
 
         try:
             dia, mes = date_str.split("-")
@@ -125,7 +121,6 @@ async def update_birthday_message(ctx):
             print(f"Error procesando cumpleaños: {e}")
             continue
 
-    # Armar el mensaje de la lista de cumpleaños organizada
     months_order = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -141,7 +136,6 @@ async def update_birthday_message(ctx):
     if not message.strip():
         message = "No hay cumpleaños registrados aún."
 
-    # 📌 Actualizar o fijar el mensaje en el canal de cumpleaños
     pinned = await channel_cumples.pins()
     if pinned:
         await pinned[0].edit(content=message)
@@ -149,50 +143,43 @@ async def update_birthday_message(ctx):
         msg = await channel_cumples.send(message)
         await msg.pin()
 
-
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def removebirthday(ctx, user: discord.User):
     """Solo admins: elimina un cumpleaños."""
     
-    # Verificar si el comando se ejecuta en el canal correcto
     if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
         message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
         await message.add_reaction("❌")
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
         return
 
-    # Verificar si el autor del comando es admin
     if not ctx.author.guild_permissions.administrator:
         message = await ctx.reply("❌ No tienes permisos suficientes para usar este comando.")
         await message.add_reaction("❌")
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
         return
 
     result = birthdays.delete_one({"user_id": user.id})
 
     if result.deleted_count:
         message = await ctx.reply(f"✔️ Cumpleaños de {user} eliminado.")
-        await ctx.message.add_reaction("✅")  # Reacción al mensaje original
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
+        await ctx.message.add_reaction("✅")
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
 
-        # Después de eliminar el cumpleaños, actualizamos el mensaje fijado
         await update_birthday_message(ctx)
     else:
         message = await ctx.reply("❌ Ese usuario no tiene cumpleaños registrado.")
         await message.add_reaction("❌")
-        await asyncio.sleep(30)  # Esperar 30 segundos
-        await message.delete()  # Eliminar mensaje del bot después de 30 segundos
-        await ctx.message.delete()  # Eliminar mensaje del usuario después de 30 segundos
-
-from collections import defaultdict
-import discord
+        await asyncio.sleep(30)
+        await message.delete()
+        await ctx.message.delete()
 
 async def update_birthday_message(ctx):
     guild = ctx.guild
@@ -245,9 +232,6 @@ async def update_birthday_message(ctx):
     else:
         msg = await channel_cumples.send(message)
         await msg.pin()
-
-
-# Reemplaza tu función check_birthdays por esta versión modificada:
 
 @tasks.loop(hours=24)
 async def check_birthdays():

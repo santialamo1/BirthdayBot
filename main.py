@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 from pymongo import MongoClient
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytz  # Se agregó pytz para manejar la zona horaria
 import os
 import random
@@ -249,23 +249,28 @@ async def check_birthdays():
     celebrants = list(birthdays.find({"date": today}))
 
     birthday_messages = [
-        "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje...",
-        "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras...",
-        "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek...",
-        "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>!...",
-        "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración...",
-        "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado...",
+        "👑 En este día especial, el Emperador Jerek se dirige a <@{user_id}> para rendirle homenaje.",
+        "🎉 ¡Hoy es un día único en el calendario imperial! El Emperador Jerek extiende sus palabras.",
+        "⚔️ En este día glorioso, <@{user_id}> recibe las bendiciones del Emperador Jerek.",
+        "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>!",
+        "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración!",
+        "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado!",
     ]
 
+    available_messages = birthday_messages [:]
+
     if celebrants:
-        for user_data in celebrants:
+    
+        messages_today = random.sample(available_messages, min(len(available_messages), len(celebrants)))
+
+        for user_data, message in zip(celebrants, messages_today):
             user_id = user_data["user_id"]
-            msg = random.choice(birthday_messages).format(user_id=user_id)
+            msg = message.format(user_id=user_id)
             sent_msg = await channel_chat.send(msg)
 
             # ⏳ Eliminar el mensaje después de 24 horas
             async def delete_later(message):
-                await discord.utils.sleep_until(datetime.utcnow().replace(hour=message.created_at.hour, minute=message.created_at.minute, second=message.created_at.second) + timedelta(days=1))
+                await discord.utils.sleep_until(datetime.now(timezone.utc).replace(hour=message.created_at.hour, minute=message.created_at.minute, second=message.created_at.second) + timedelta(days=1))
                 try:
                     await message.delete()
                 except discord.NotFound:

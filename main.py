@@ -310,6 +310,49 @@ async def check_birthdays():
 
             bot.loop.create_task(delete_later(sent_msg))
 
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def cumpleatrasado(ctx, user: discord.User = None):
+    """Solo admins: envía un saludo de cumpleaños atrasado."""
+    
+    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
+        message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
+        await message.add_reaction("❌")
+        await asyncio.sleep(5)
+        await message.delete()
+        await ctx.message.delete()
+        return
+
+    if not user:
+        message = await ctx.reply("❌ Debes mencionar a un usuario. Usa `!cumpleatrasado @usuario`")
+        await message.add_reaction("❌")
+        await asyncio.sleep(5)
+        await message.delete()
+        await ctx.message.delete()
+        return
+
+    guild = ctx.guild
+    channel_chat = guild.get_channel(CHANNEL_CHAT_ID)
+
+    # Mensajes de cumpleaños atrasado con temática imperial
+    delayed_birthday_messages = [
+        "⚔️ ¡El Emperador Jerek extiende sus disculpas! Aunque los tiempos del imperio a veces fallan, hoy saludamos a <@{user_id}> con honor.",
+        "👑 ¡Los cronistas del Imperio han cometido un error! Pero el Emperador Jerek no dejará pasar la oportunidad de celebrar el natalicio de <@{user_id}>.",
+        "🏰 Aunque el tiempo nos ha jugado una mala pasada, el reino entero celebra hoy el cumpleaños de <@{user_id}> con honor.",
+        "🔥 El Emperador Jerek ha decretado que el retraso no debe opacar la celebración. ¡Feliz cumpleaños atrasado, <@{user_id}>!",
+        "🌟 Los astros del Imperio se alinean hoy para enmendar el olvido. ¡Saludos, <@{user_id}>, tu día no ha pasado desapercibido!",
+        "📜 Se ha enviado un edicto imperial corrigiendo el descuido: ¡<@{user_id}>, el Imperio celebra tu cumpleaños hoy!",
+        "🗡️ El Emperador Jerek proclama que <@{user_id}> merece la festividad que el calendario olvidó. ¡Feliz cumpleaños atrasado!",
+    ]
+
+    selected_message = random.choice(delayed_birthday_messages).format(user_id=user.id)
+    await channel_chat.send(selected_message)
+
+    # Eliminar el mensaje de comando después de 5 segundos
+    await asyncio.sleep(5)
+    await ctx.message.delete()
+
+
 async def main():
     await start_webserver()
     await bot.start(DISCORD_TOKEN)

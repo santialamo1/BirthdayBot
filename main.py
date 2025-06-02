@@ -7,6 +7,20 @@ import os
 import random
 from collections import defaultdict
 import asyncio
+from aiohttp import web
+
+# Código para crear un servidor HTTP mínimo usando aiohttp
+async def handle_ping(request):
+    return web.Response(text="OK")
+
+async def start_webserver():
+    app = web.Application()
+    app.add_routes([web.get('/ping', handle_ping)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv('PORT', 8080)))
+    await site.start()
+    print("Servidor web iniciado en /ping")
 
 intents = discord.Intents.default()
 intents.message_content = True

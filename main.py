@@ -49,6 +49,14 @@ async def on_ready():
     check_birthdays.start()
 
 @bot.command()
+async def status(ctx):
+    """Comando para que cualquiera pueda verificar si el bot está activo."""
+    msg = await ctx.send("✅ El bot está activo y funcionando correctamente.")
+    await asyncio.sleep(5)
+    await msg.delete()
+    await ctx.message.delete()
+
+@bot.command()
 async def addbirthday(ctx, name: str = None, date: str = None):
     """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
     
@@ -259,7 +267,7 @@ async def check_birthdays():
         print("No se encontró el canal de chat.")
         return
 
-    today = datetime.now().strftime("%d-%m")
+    today = datetime.now(argentina_tz).strftime("%d-%m")
     celebrants = list(birthdays.find({"date": today}))
 
     birthday_messages = [
@@ -269,6 +277,16 @@ async def check_birthdays():
         "🌟 ¡Que el Emperador Jerek proclame este día como el Día de <@{user_id}>!",
         "🧁 ¡<@{user_id}> celebra otro año de vida bajo el reconocimiento y la admiración!",
         "🔥 ¡El Emperador Jerek decreta que el cumpleaños de <@{user_id}> sea celebrado!",
+        "🏰 ¡Desde las torres más altas del Imperio, el Emperador Jerek anuncia el natalicio de <@{user_id}>!",
+        "🥳 ¡Las campanas resuenan en todo el reino por el cumpleaños de <@{user_id}>!",
+        "🗡️ Que los bardos canten y los dragones bailen, pues <@{user_id}> ha nacido en este día glorioso.",
+        "👑 El Emperador Jerek eleva su copa por <@{user_id}> y declara festivo en todo el Imperio.",
+        "🌌 ¡Los astros se alinean para rendir tributo al nacimiento de <@{user_id}>!",
+        "💫 ¡Que el legado de <@{user_id}> crezca tanto como la gloria del Imperio!",
+        "📜 Por decreto imperial, el cumpleaños de <@{user_id}> será recordado por generaciones.",
+        "🎇 Hoy el firmamento se ilumina con fuegos imperiales en honor a <@{user_id}>.",
+        "🏹 Desde las tierras lejanas hasta la capital, todos festejan el natalicio de <@{user_id}>.",
+        "🕯️ Que las velas del castillo se enciendan: ¡<@{user_id}> celebra otro año de sabiduría y poder!",
     ]
 
     available_messages = birthday_messages [:]
@@ -292,5 +310,9 @@ async def check_birthdays():
 
             bot.loop.create_task(delete_later(sent_msg))
 
+async def main():
+    await start_webserver()
+    await bot.start(DISCORD_TOKEN)
 
-bot.run(DISCORD_TOKEN)
+asyncio.run(main())
+

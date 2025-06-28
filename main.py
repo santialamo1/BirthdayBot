@@ -57,61 +57,72 @@ async def status(ctx):
     await ctx.message.delete()
 
 @bot.command()
-async def addbirthday(ctx, name: str = None, date: str = None):
-    """Agrega tu cumpleaños en formato !addbirthday Nombre DD-MM"""
-    
-    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
-        message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
-        await message.add_reaction("❌")
-        await asyncio.sleep(30)
-        await message.delete()
-        await ctx.message.delete()
-        return
-    
-    user_id = ctx.author.id
+async def addbirthday(ctx, user_or_name: discord.User = None, name_or_date: str = None, maybe_date: str = None):
+    """Admins pueden usar: !addbirthday @Usuario Nombre DD-MM"""
+
     is_admin = ctx.author.guild_permissions.administrator
 
-    if not name or not date:
-        message = await ctx.reply("❌ Falta información. El formato correcto es: `!addbirthday Nombre DD-MM`")
-        await message.add_reaction("❌")
+    # Determinar si el primer argumento es un usuario mencionado
+    if is_admin and isinstance(user_or_name, discord.User):
+        user = user_or_name
+        name = name_or_date
+        date = maybe_date
+    else:
+        user = ctx.author
+        name = str(user_or_name)
+        date = name_or_date
+
+    # Validaciones previas
+    if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
+        msg = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
+        await msg.add_reaction("❌")
         await asyncio.sleep(30)
-        await message.delete()
+        await msg.delete()
         await ctx.message.delete()
         return
 
-    if not is_admin:
-        existing = birthdays.find_one({"user_id": user_id})
-        if existing:
-            message = await ctx.reply("❌ Ya registraste tu cumpleaños.")
-            await message.add_reaction("❌")
-            await asyncio.sleep(30)
-            await message.delete()
-            await ctx.message.delete()
-            return
+    if not name or not date:
+        msg = await ctx.reply("❌ Falta información. Formato: `!addbirthday Nombre DD-MM` o `!addbirthday @Usuario Nombre DD-MM` (admins).")
+        await msg.add_reaction("❌")
+        await asyncio.sleep(30)
+        await msg.delete()
+        await ctx.message.delete()
+        return
 
     try:
-        # Validamos el formato de fecha DD-MM
         datetime.strptime(date, "%d-%m")
     except ValueError:
-        message = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
-        await message.add_reaction("❌")
+        msg = await ctx.reply("❌ Formato inválido. Usá DD-MM (por ejemplo 23-07).")
+        await msg.add_reaction("❌")
         await asyncio.sleep(30)
-        await message.delete()
+        await msg.delete()
         await ctx.message.delete()
         return
 
-    birthdays.insert_one({
-        "user_id": user_id,
-        "username": str(ctx.author),
-        "name": name,
-        "date": date
-    })
+    # Evitar duplicados si no es admin
+    if not is_admin and birthdays.find_one({"user_id": user.id}):
+        msg = await ctx.reply("❌ Ya registraste tu cumpleaños.")
+        await msg.add_reaction("❌")
+        await asyncio.sleep(30)
+        await msg.delete()
+        await ctx.message.delete()
+        return
 
-    message = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** el **{date}**.")
+    birthdays.update_one(
+        {"user_id": user.id},
+        {"$set": {
+            "user_id": user.id,
+            "username": str(user),
+            "name": name,
+            "date": date
+        }},
+        upsert=True
+    )
+
+    msg = await ctx.reply(f"✔️ Cumpleaños guardado para **{name}** (<@{user.id}>) el **{date}**.")
     await ctx.message.add_reaction("✅")
-
     await asyncio.sleep(30)
-    await message.delete()
+    await msg.delete()
     await ctx.message.delete()
 
     await update_birthday_message(ctx)
@@ -166,41 +177,44 @@ async def update_birthday_message(ctx):
         await msg.pin()
 
 @bot.command()
-@commands.has_permissions(administrator=True)
-async def removebirthday(ctx, user: discord.User):
-    """Solo admins: elimina un cumpleaños."""
-    
+async def removebirthday(ctx, user: discord.User = None):
+    """Elimina un cumpleaños. Admins pueden eliminar cumpleaños ajenos."""
+
+    is_admin = ctx.author.guild_permissions.administrator
+    target = user if user and is_admin else ctx.author
+
+    if user and not is_admin:
+        msg = await ctx.reply("❌ Solo los administradores pueden eliminar cumpleaños de otros usuarios.")
+        await msg.add_reaction("❌")
+        await asyncio.sleep(30)
+        await msg.delete()
+        await ctx.message.delete()
+        return
+
     if ctx.channel.id != CHANNEL_AGGCUMPLE_ID:
-        message = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
-        await message.add_reaction("❌")
+        msg = await ctx.reply("❌ Este comando solo se puede usar en el canal de cumpleaños.")
+        await msg.add_reaction("❌")
         await asyncio.sleep(30)
-        await message.delete()
+        await msg.delete()
         await ctx.message.delete()
         return
 
-    if not ctx.author.guild_permissions.administrator:
-        message = await ctx.reply("❌ No tienes permisos suficientes para usar este comando.")
-        await message.add_reaction("❌")
-        await asyncio.sleep(30)
-        await message.delete()
-        await ctx.message.delete()
-        return
-
-    result = birthdays.delete_one({"user_id": user.id})
+    cumple_info = birthdays.find_one({"user_id": target.id})
+    result = birthdays.delete_one({"user_id": target.id})
 
     if result.deleted_count:
-        message = await ctx.reply(f"✔️ Cumpleaños de {user} eliminado.")
+        name = cumple_info.get("name", target.name) if cumple_info else target.name
+        msg = await ctx.reply(f"✔️ Cumpleaños de **{name}** (<@{target.id}>) eliminado.")
         await ctx.message.add_reaction("✅")
         await asyncio.sleep(30)
-        await message.delete()
+        await msg.delete()
         await ctx.message.delete()
-
         await update_birthday_message(ctx)
     else:
-        message = await ctx.reply("❌ Ese usuario no tiene cumpleaños registrado.")
-        await message.add_reaction("❌")
+        msg = await ctx.reply("❌ Ese usuario no tiene cumpleaños registrado.")
+        await msg.add_reaction("❌")
         await asyncio.sleep(30)
-        await message.delete()
+        await msg.delete()
         await ctx.message.delete()
 
 async def update_birthday_message(ctx):
@@ -255,7 +269,6 @@ async def update_birthday_message(ctx):
         msg = await channel_cumples.send(message)
         await msg.pin()
 
-@tasks.loop(hours=24)
 async def check_birthdays():
     guild = bot.get_guild(GUILD_ID)
     if not guild:
@@ -289,10 +302,9 @@ async def check_birthdays():
         "🕯️ Que las velas del castillo se enciendan: ¡<@{user_id}> celebra otro año de sabiduría y poder!",
     ]
 
-    available_messages = birthday_messages [:]
+    available_messages = birthday_messages[:]
 
     if celebrants:
-    
         messages_today = random.sample(available_messages, min(len(available_messages), len(celebrants)))
 
         for user_data, message in zip(celebrants, messages_today):
@@ -302,7 +314,13 @@ async def check_birthdays():
 
             # ⏳ Eliminar el mensaje después de 24 horas
             async def delete_later(message):
-                await discord.utils.sleep_until(datetime.now(timezone.utc).replace(hour=message.created_at.hour, minute=message.created_at.minute, second=message.created_at.second) + timedelta(days=1))
+                await discord.utils.sleep_until(
+                    datetime.now(timezone.utc).replace(
+                        hour=message.created_at.hour,
+                        minute=message.created_at.minute,
+                        second=message.created_at.second
+                    ) + timedelta(days=1)
+                )
                 try:
                     await message.delete()
                 except discord.NotFound:
@@ -352,10 +370,25 @@ async def cumpleatrasado(ctx, user: discord.User = None):
     await asyncio.sleep(5)
     await ctx.message.delete()
 
+async def schedule_birthday_check():
+    from datetime import time
+    target_time = time(hour=0, minute=1)
+    while True:
+        now = datetime.now(argentina_tz)
+        target_datetime = argentina_tz.localize(datetime.combine(now.date(), target_time))
+        if now >= target_datetime:
+            target_datetime += timedelta(days=1)
+        await discord.utils.sleep_until(target_datetime)
+        await check_birthdays()
+
+@bot.event
+async def on_ready():
+    print(f"¡Bot activo como {bot.user}!")
+    bot.loop.create_task(schedule_birthday_check())
+
 
 async def main():
     await start_webserver()
     await bot.start(DISCORD_TOKEN)
 
 asyncio.run(main())
-

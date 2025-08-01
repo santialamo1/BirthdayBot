@@ -391,7 +391,8 @@ async def schedule_birthday_check():
 @bot.event
 async def on_ready():
     print(f"¡Bot activo como {bot.user}!")
-    bot.loop.create_task(schedule_birthday_check())
+    bot.loop.create_task(schedule_birthday_check())  # loop diario a las 00:01
+    await check_birthdays()
 
 
 async def main():

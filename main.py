@@ -392,6 +392,7 @@ async def on_ready():
 
 async def main():
     await start_webserver()
-    await bot.start(DISCORD_TOKEN)
+    await bot.login(DISCORD_TOKEN)
+    await bot.connect()
 
 asyncio.run(main())

@@ -43,11 +43,6 @@ birthdays = db["birthdays"]
 # Zona horaria de Argentina
 argentina_tz = pytz.timezone("America/Argentina/Buenos_Aires")
 
-@bot.event
-async def on_ready():
-    print(f"¡Bot activo como {bot.user}!")
-    bot.loop.create_task(schedule_birthday_check())
-    await check_birthdays()
 
 @bot.command()
 async def status(ctx):

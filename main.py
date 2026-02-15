@@ -391,8 +391,9 @@ async def on_ready():
 
 
 async def main():
-    await start_webserver()
-    await bot.login(DISCORD_TOKEN)
-    await bot.connect()
+    web_task = asyncio.create_task(start_webserver())
+    bot_task = asyncio.create_task(bot.start(DISCORD_TOKEN))
+    await asyncio.gather(web_task, bot_task)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
